@@ -41,7 +41,9 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            tesseract-ocr \
+            poppler-utils
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -62,10 +64,6 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Download Ollama sidecar (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: bash scripts/download-ollama.sh ${{ matrix.target }}
-
       - name: Install zstd (macOS)
         if: runner.os == 'macOS'
         run: brew install zstd
@@ -73,6 +71,10 @@ jobs:
       - name: Install zstd (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get install -y zstd
+
+      - name: Download Ollama sidecar (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: bash scripts/download-ollama.sh ${{ matrix.target }}
 
       - name: Download Ollama sidecar (Windows)
         if: runner.os == 'Windows'
@@ -89,6 +91,85 @@ jobs:
           Copy-Item $found.FullName $dest
           Remove-Item -Recurse -Force ollama-temp, ollama-windows.zip
           Write-Host "Done: $(Get-Item $dest | Select-Object -ExpandProperty Length) bytes"
+
+      - name: Bundle OCR tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p src-tauri/ocr-tools/tessdata
+          cp "$(which tesseract)" src-tauri/ocr-tools/tesseract
+          cp "$(which pdftoppm)" src-tauri/ocr-tools/pdftoppm
+          cp /usr/share/tesseract-ocr/*/tessdata/eng.traineddata src-tauri/ocr-tools/tessdata/ 2>/dev/null || \
+            curl -fSL -o src-tauri/ocr-tools/tessdata/eng.traineddata \
+              https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata
+          for bin in src-tauri/ocr-tools/tesseract src-tauri/ocr-tools/pdftoppm; do
+            ldd "$bin" 2>/dev/null | grep "=> /" | awk '{print $3}' | while read -r lib; do
+              libname="$(basename "$lib")"
+              case "$libname" in
+                libc.so*|libm.so*|libpthread.so*|libdl.so*|librt.so*|ld-linux*) ;;
+                *) cp "$lib" src-tauri/ocr-tools/ 2>/dev/null || true ;;
+              esac
+            done
+          done
+          chmod +x src-tauri/ocr-tools/tesseract src-tauri/ocr-tools/pdftoppm
+          ls -la src-tauri/ocr-tools/
+
+      - name: Bundle OCR tools (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install tesseract poppler
+          mkdir -p src-tauri/ocr-tools/tessdata
+          cp "$(brew --prefix)/bin/tesseract" src-tauri/ocr-tools/tesseract
+          cp "$(brew --prefix)/bin/pdftoppm" src-tauri/ocr-tools/pdftoppm
+          TESSDATA="$(brew --prefix)/share/tessdata"
+          if [ -f "$TESSDATA/eng.traineddata" ]; then
+            cp "$TESSDATA/eng.traineddata" src-tauri/ocr-tools/tessdata/
+          else
+            curl -fSL -o src-tauri/ocr-tools/tessdata/eng.traineddata \
+              https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata
+          fi
+          for bin in src-tauri/ocr-tools/tesseract src-tauri/ocr-tools/pdftoppm; do
+            otool -L "$bin" 2>/dev/null | grep "$(brew --prefix)" | awk '{print $1}' | while read -r lib; do
+              libname="$(basename "$lib")"
+              [ ! -f "src-tauri/ocr-tools/$libname" ] && cp "$lib" "src-tauri/ocr-tools/$libname" 2>/dev/null || true
+            done
+          done
+          chmod +x src-tauri/ocr-tools/tesseract src-tauri/ocr-tools/pdftoppm
+          ls -la src-tauri/ocr-tools/
+
+      - name: Bundle OCR tools (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ocrDir = "src-tauri/ocr-tools"
+          $tessdata = "$ocrDir/tessdata"
+          New-Item -ItemType Directory -Force -Path $tessdata | Out-Null
+
+          # Download Poppler
+          $popplerUrl = "https://github.com/oschwartz10612/poppler-windows/releases/download/v25.12.0-0/Release-25.12.0-0.zip"
+          Write-Host "Downloading Poppler..."
+          Invoke-WebRequest -Uri $popplerUrl -OutFile poppler.zip
+          Expand-Archive poppler.zip -DestinationPath poppler-temp
+          $popplerBin = Get-ChildItem -Path poppler-temp -Recurse -Filter "pdftoppm.exe" | Select-Object -First 1
+          $popplerBinDir = $popplerBin.DirectoryName
+          Copy-Item "$popplerBinDir/*.exe" $ocrDir/
+          Copy-Item "$popplerBinDir/*.dll" $ocrDir/
+          Remove-Item -Recurse -Force poppler-temp, poppler.zip
+
+          # Download Tesseract via choco (available on GH Actions Windows runners)
+          Write-Host "Installing Tesseract via Chocolatey..."
+          choco install tesseract --no-progress -y
+          $tessPath = "C:\Program Files\Tesseract-OCR"
+          Copy-Item "$tessPath\tesseract.exe" "$ocrDir/"
+          Get-ChildItem "$tessPath\*.dll" | Copy-Item -Destination "$ocrDir/"
+          if (Test-Path "$tessPath\tessdata\eng.traineddata") {
+            Copy-Item "$tessPath\tessdata\eng.traineddata" "$tessdata/"
+          } else {
+            Write-Host "Downloading eng.traineddata..."
+            Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata" -OutFile "$tessdata/eng.traineddata"
+          }
+
+          Write-Host "OCR tools bundled:"
+          Get-ChildItem $ocrDir -Recurse | Format-Table Name, Length
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

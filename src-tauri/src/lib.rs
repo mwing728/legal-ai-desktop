@@ -217,6 +217,48 @@ struct AppState {
     http: reqwest::Client,
     engine: Arc<ironclaw::core::Engine>,
     workflows: Arc<tokio::sync::Mutex<WorkflowEngine>>,
+    ocr_tools_dir: Option<std::path::PathBuf>,
+}
+
+fn find_ocr_tools_dir() -> Option<std::path::PathBuf> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+
+    let candidates = [
+        exe_dir.join("ocr-tools"),
+        exe_dir.join("resources").join("ocr-tools"),
+        exe_dir.join("_up_").join("Resources").join("ocr-tools"), // macOS .app bundle
+    ];
+
+    for c in &candidates {
+        if c.exists() {
+            return Some(c.clone());
+        }
+    }
+    None
+}
+
+fn resolve_ocr_tool(ocr_dir: &Option<std::path::PathBuf>, tool: &str) -> std::path::PathBuf {
+    if let Some(dir) = ocr_dir {
+        let candidate = if cfg!(target_os = "windows") {
+            dir.join(format!("{}.exe", tool))
+        } else {
+            dir.join(tool)
+        };
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+    std::path::PathBuf::from(tool)
+}
+
+fn resolve_tessdata_dir(ocr_dir: &Option<std::path::PathBuf>) -> Option<std::path::PathBuf> {
+    if let Some(dir) = ocr_dir {
+        let candidate = dir.join("tessdata");
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 // ── Dashboard ───────────────────────────────────────────────────────
@@ -478,7 +520,7 @@ async fn process_document(
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
-    let text = extract_text_from_file(path).map_err(|e| e.to_string())?;
+    let text = extract_text_from_file(path, &state.ocr_tools_dir).map_err(|e| e.to_string())?;
 
     let doc_id = state
         .db
@@ -841,18 +883,23 @@ fn has_meaningful_text(text: &str) -> bool {
     text.chars().filter(|c| c.is_alphanumeric()).count() > 100
 }
 
-fn ocr_image(path: &std::path::Path) -> anyhow::Result<String> {
-    let output = std::process::Command::new("tesseract")
-        .arg(path)
+fn ocr_image(path: &std::path::Path, ocr_dir: &Option<std::path::PathBuf>) -> anyhow::Result<String> {
+    let tesseract = resolve_ocr_tool(ocr_dir, "tesseract");
+    let mut cmd = std::process::Command::new(&tesseract);
+    cmd.arg(path)
         .arg("stdout")
         .arg("--oem")
         .arg("1")
         .arg("-l")
-        .arg("eng")
-        .output()
-        .map_err(|e| anyhow::anyhow!(
-            "Failed to run tesseract (is tesseract-ocr installed?): {}", e
-        ))?;
+        .arg("eng");
+
+    if let Some(tessdata) = resolve_tessdata_dir(ocr_dir) {
+        cmd.env("TESSDATA_PREFIX", tessdata);
+    }
+
+    let output = cmd.output().map_err(|e| anyhow::anyhow!(
+        "Failed to run tesseract at '{}': {}", tesseract.display(), e
+    ))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -862,12 +909,13 @@ fn ocr_image(path: &std::path::Path) -> anyhow::Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-fn ocr_pdf(path: &std::path::Path) -> anyhow::Result<String> {
+fn ocr_pdf(path: &std::path::Path, ocr_dir: &Option<std::path::PathBuf>) -> anyhow::Result<String> {
     let tmp_dir = std::env::temp_dir().join(format!("legal-ai-ocr-{}", std::process::id()));
     std::fs::create_dir_all(&tmp_dir)?;
 
     let result = (|| -> anyhow::Result<String> {
-        let status = std::process::Command::new("pdftoppm")
+        let pdftoppm = resolve_ocr_tool(ocr_dir, "pdftoppm");
+        let status = std::process::Command::new(&pdftoppm)
             .arg("-png")
             .arg("-r")
             .arg("200")
@@ -875,7 +923,7 @@ fn ocr_pdf(path: &std::path::Path) -> anyhow::Result<String> {
             .arg(tmp_dir.join("page"))
             .status()
             .map_err(|e| anyhow::anyhow!(
-                "Failed to run pdftoppm (is poppler-utils installed?): {}", e
+                "Failed to run pdftoppm at '{}': {}", pdftoppm.display(), e
             ))?;
 
         if !status.success() {
@@ -891,7 +939,7 @@ fn ocr_pdf(path: &std::path::Path) -> anyhow::Result<String> {
 
         let mut full_text = String::new();
         for page_img in &pages {
-            match ocr_image(page_img) {
+            match ocr_image(page_img, ocr_dir) {
                 Ok(page_text) => {
                     full_text.push_str(&page_text);
                     full_text.push('\n');
@@ -909,7 +957,7 @@ fn ocr_pdf(path: &std::path::Path) -> anyhow::Result<String> {
     result
 }
 
-fn extract_text_from_file(path: &std::path::Path) -> anyhow::Result<String> {
+fn extract_text_from_file(path: &std::path::Path, ocr_dir: &Option<std::path::PathBuf>) -> anyhow::Result<String> {
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
@@ -921,7 +969,7 @@ fn extract_text_from_file(path: &std::path::Path) -> anyhow::Result<String> {
             let bytes = std::fs::read(path)?;
             let text_layer = pdf_extract::extract_text_from_mem(&bytes)
                 .unwrap_or_default();
-            let ocr_text = ocr_pdf(path).unwrap_or_default();
+            let ocr_text = ocr_pdf(path, ocr_dir).unwrap_or_default();
 
             if ocr_text.len() > text_layer.len() {
                 Ok(ocr_text)
@@ -953,7 +1001,7 @@ fn extract_text_from_file(path: &std::path::Path) -> anyhow::Result<String> {
             }
             Ok(text)
         }
-        "jpg" | "jpeg" | "png" | "tiff" | "tif" | "bmp" => ocr_image(path),
+        "jpg" | "jpeg" | "png" | "tiff" | "tif" | "bmp" => ocr_image(path, ocr_dir),
         _ => Err(anyhow::anyhow!("Unsupported file type: {}", ext)),
     }
 }
@@ -1735,6 +1783,7 @@ pub fn run() {
             http,
             engine,
             workflows: Arc::new(tokio::sync::Mutex::new(workflows)),
+            ocr_tools_dir: find_ocr_tools_dir(),
         })
         .manage(ollama_manager)
         .setup(|app| {
