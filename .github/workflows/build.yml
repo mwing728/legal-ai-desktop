@@ -66,17 +66,29 @@ jobs:
         if: runner.os != 'Windows'
         run: bash scripts/download-ollama.sh ${{ matrix.target }}
 
+      - name: Install zstd (macOS)
+        if: runner.os == 'macOS'
+        run: brew install zstd
+
+      - name: Install zstd (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y zstd
+
       - name: Download Ollama sidecar (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $version = "0.18.3"
+          $version = "0.19.0"
           $outDir = "src-tauri/binaries"
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-          $url = "https://github.com/ollama/ollama/releases/download/v${version}/ollama-windows-amd64.exe"
+          $url = "https://github.com/ollama/ollama/releases/download/v${version}/ollama-windows-amd64.zip"
           $dest = Join-Path $outDir "ollama-x86_64-pc-windows-msvc.exe"
-          Write-Host "Downloading $url -> $dest"
-          Invoke-WebRequest -Uri $url -OutFile $dest
+          Write-Host "Downloading $url"
+          Invoke-WebRequest -Uri $url -OutFile ollama-windows.zip
+          Expand-Archive ollama-windows.zip -DestinationPath ollama-temp
+          $found = Get-ChildItem -Path ollama-temp -Recurse -Filter "ollama.exe" | Select-Object -First 1
+          Copy-Item $found.FullName $dest
+          Remove-Item -Recurse -Force ollama-temp, ollama-windows.zip
           Write-Host "Done: $(Get-Item $dest | Select-Object -ExpandProperty Length) bytes"
 
       - name: Build Tauri app
