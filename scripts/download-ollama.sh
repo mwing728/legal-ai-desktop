@@ -4,8 +4,7 @@ set -euo pipefail
 OLLAMA_VERSION="${OLLAMA_VERSION:-0.19.0}"
 BASE_URL="https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-OUT_DIR="${SCRIPT_DIR}/../src-tauri/binaries"
-mkdir -p "$OUT_DIR"
+OUT_DIR="${SCRIPT_DIR}/../src-tauri"
 OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 
 detect_target() {

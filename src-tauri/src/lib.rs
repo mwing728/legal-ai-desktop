@@ -60,7 +60,7 @@ impl OllamaManager {
 
         let sidecar = app
             .shell()
-            .sidecar("binaries/ollama")
+            .sidecar("ollama")
             .unwrap()
             .env("OLLAMA_HOST", "127.0.0.1:11435")
             .env("OLLAMA_MODELS", models_dir.to_string_lossy().to_string())

@@ -7,7 +7,7 @@ dist/
 src-tauri/target/
 
 # Ollama sidecar binaries (downloaded per-platform, not committed)
-src-tauri/binaries/
+src-tauri/ollama-*
 
 # Generated icon source
 app-icon.png
