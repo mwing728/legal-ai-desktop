@@ -48,11 +48,15 @@ export default function Setup({ onReady }: Props) {
     }
   };
 
-  const retry = () => {
+  const retry = async () => {
     setError(null);
     setState("starting");
     setProgress(0);
-    poll();
+    try {
+      await api.retryOllamaSetup();
+    } catch {
+      // Backend will update status via polling
+    }
   };
 
   return (

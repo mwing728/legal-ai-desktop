@@ -6,8 +6,9 @@ node_modules/
 dist/
 src-tauri/target/
 
-# Ollama sidecar binaries (downloaded per-platform, not committed)
-src-tauri/ollama-*
+# Ollama binary (downloaded per-platform, not committed)
+src-tauri/ollama-bin/*
+!src-tauri/ollama-bin/.gitkeep
 
 # OCR tools (downloaded per-platform, not committed)
 src-tauri/ocr-tools/*
@@ -34,4 +35,3 @@ __pycache__/
 # Environment
 .env
 .env.*
-src-tauri/binaries/

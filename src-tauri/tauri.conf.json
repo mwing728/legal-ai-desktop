@@ -19,8 +19,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["ollama"],
-    "resources": ["ocr-tools/**/*"],
+    "resources": ["ocr-tools/**/*", "ollama-bin/**/*"],
     "shortDescription": "AI-powered legal document assistant",
     "longDescription": "A privacy-first desktop application for AI-powered legal document management, analysis, and case organization. All AI processing runs locally.",
     "linux": {

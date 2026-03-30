@@ -209,5 +209,6 @@ export const api = {
     invoke<ReviewPacketResult>("generate_review_packet", { documentId }),
 
   getOllamaStatus: () => invoke<OllamaStatus>("get_ollama_status"),
+  retryOllamaSetup: () => invoke<void>("retry_ollama_setup"),
   deleteAllAppData: () => invoke<string>("delete_all_app_data"),
 };
