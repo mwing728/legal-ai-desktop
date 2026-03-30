@@ -15,7 +15,11 @@ default_provider = "ollama"
 default_model = "phi4-mini"
 max_turns = 100
 tool_timeout_secs = 300
-max_daily_cost_cents = 0
+max_daily_cost_cents = 999999
+
+[providers.ollama]
+provider_type = "ollama"
+base_url = "http://127.0.0.1:11435"
 
 [sandbox]
 backend = "native"

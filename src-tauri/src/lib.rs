@@ -57,6 +57,11 @@ fn find_ollama_binary() -> Option<std::path::PathBuf> {
             }
         }
     }
+
+    if let Ok(path) = which::which("ollama") {
+        return Some(path);
+    }
+
     None
 }
 
