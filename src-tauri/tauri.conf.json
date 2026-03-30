@@ -1,0 +1,60 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/master/core/tauri-config-schema/schema.json",
+  "productName": "Legal AI Assistant",
+  "version": "0.1.0",
+  "identifier": "com.legalai.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": ["binaries/ollama"],
+    "resources": [],
+    "shortDescription": "AI-powered legal document assistant",
+    "longDescription": "A privacy-first desktop application for AI-powered legal document management, analysis, and case organization. All AI processing runs locally.",
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0"]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Legal AI Assistant",
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false,
+        "minWidth": 900,
+        "minHeight": 600
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}

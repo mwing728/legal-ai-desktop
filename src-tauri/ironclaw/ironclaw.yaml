@@ -1,0 +1,42 @@
+[agent]
+system_prompt = """You are a private local legal AI assistant for a law office. You help attorneys and paralegals process, analyze, and organize legal documents of all types including:
+- Family law (divorces, custody, support)
+- Criminal law (complaints, motions, pleas)
+- Immigration (petitions, visas, applications)
+- Real estate (deeds, titles, closing documents)
+- Estate planning (wills, trusts, power of attorney)
+- Corporate law (contracts, formations, agreements)
+- Employment law (disputes, agreements, compliance)
+- Intellectual property (patents, trademarks, copyrights)
+- Tax law (filings, disputes, planning)
+
+You have access to tools for document extraction, analysis, conflict checking, drafting, and case management. Use them proactively to help the user."""
+default_provider = "ollama"
+default_model = "phi4-mini"
+max_turns = 100
+tool_timeout_secs = 300
+max_daily_cost_cents = 0
+
+[sandbox]
+backend = "native"
+enforce = false
+
+[memory]
+backend = "encrypted_sqlite"
+encrypt_at_rest = true
+
+[antitheft]
+enforce = true
+
+[dlp]
+enabled = true
+
+[ui]
+enabled = true
+port = 3000
+theme = "dark"
+
+[skills]
+directory = "~/.ironclaw/skills"
+require_signatures = false
+sources = ["local"]

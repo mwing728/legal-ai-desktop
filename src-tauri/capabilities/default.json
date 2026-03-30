@@ -1,0 +1,27 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for the Legal AI desktop app",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "dialog:default",
+    "fs:default",
+    "fs:allow-read-file",
+    "fs:allow-read-dir",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$HOME/.ironclaw/**" },
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DESKTOP/**" }
+      ]
+    },
+    "shell:default",
+    "shell:allow-spawn",
+    "shell:allow-execute",
+    "shell:allow-kill",
+    "shell:allow-stdin-write"
+  ]
+}

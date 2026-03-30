@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.venv/
+
+# Build output
+dist/
+src-tauri/target/
+
+# Ollama sidecar binaries (downloaded per-platform, not committed)
+src-tauri/binaries/
+
+# Generated icon source
+app-icon.png
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# Legacy Python prototype
+app/
+daemon/
+data/
+__pycache__/
+
+# Environment
+.env
+.env.*

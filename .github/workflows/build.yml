@@ -1,0 +1,97 @@
+name: Build Installers
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Download Ollama sidecar (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: bash scripts/download-ollama.sh ${{ matrix.target }}
+
+      - name: Download Ollama sidecar (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "0.18.3"
+          $outDir = "src-tauri/binaries"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          $url = "https://github.com/ollama/ollama/releases/download/v${version}/ollama-windows-amd64.exe"
+          $dest = Join-Path $outDir "ollama-x86_64-pc-windows-msvc.exe"
+          Write-Host "Downloading $url -> $dest"
+          Invoke-WebRequest -Uri $url -OutFile $dest
+          Write-Host "Done: $(Get-Item $dest | Select-Object -ExpandProperty Length) bytes"
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Legal AI Assistant ${{ github.ref_name }}"
+          releaseBody: |
+            Download the installer for your platform below.
+
+            **First launch:** The app will download the AI model (~3 GB) on first run. This only happens once.
+
+            **Uninstall:** Use your platform's standard uninstall method. To also remove AI model data, use Settings > Delete All Data before uninstalling.
+          releaseDraft: true
+          prerelease: false
+          args: --target ${{ matrix.target }}
