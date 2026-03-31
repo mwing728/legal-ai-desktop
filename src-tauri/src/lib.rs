@@ -108,13 +108,20 @@ impl OllamaManager {
             .join("models");
         let _ = std::fs::create_dir_all(&models_dir);
 
-        match tokio::process::Command::new(&ollama_bin)
-            .arg("serve")
+        let mut cmd = tokio::process::Command::new(&ollama_bin);
+        cmd.arg("serve")
             .env("OLLAMA_HOST", OLLAMA_ADDR)
             .env("OLLAMA_MODELS", models_dir.to_string_lossy().to_string())
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
+            .stderr(std::process::Stdio::piped());
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+
+        match cmd.spawn()
         {
             Ok(child) => {
                 let pid = child.id();
@@ -265,8 +272,10 @@ impl OllamaManager {
             }
             #[cfg(windows)]
             {
+                use std::os::windows::process::CommandExt;
                 let _ = std::process::Command::new("taskkill")
-                    .args(["/F", "/PID", &pid.to_string()])
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
                     .output();
             }
         }
@@ -1917,9 +1926,12 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(move |_app_handle, event| {
-            if let tauri::RunEvent::Exit = event {
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(ollama_for_shutdown.kill());
+            match event {
+                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. } => {
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.block_on(ollama_for_shutdown.kill());
+                }
+                _ => {}
             }
         });
 }
