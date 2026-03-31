@@ -216,27 +216,28 @@ Return ONLY valid JSON, no markdown or explanation."#;
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
     let body = serde_json::json!({
-        "model": "phi4-mini",
+        "model": "bonsai-8b",
         "messages": [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": format!("Analyze this legal document:\n\n{}", truncated) }
         ],
+        "max_tokens": 1536,
+        "temperature": 0.5,
         "stream": false,
-        "options": { "num_ctx": 4096 }
     });
 
     let resp = client
-        .post("http://127.0.0.1:11435/api/chat")
+        .post("http://127.0.0.1:11435/v1/chat/completions")
         .json(&body)
         .send()
         .await?;
 
     if !resp.status().is_success() {
-        anyhow::bail!("Ollama error: {}", resp.status());
+        anyhow::bail!("LLM error: {}", resp.status());
     }
 
     let json: serde_json::Value = resp.json().await?;
-    let content = json["message"]["content"].as_str().unwrap_or("{}");
+    let content = json["choices"][0]["message"]["content"].as_str().unwrap_or("{}");
 
     // Try to parse the LLM response as JSON, stripping any markdown fences
     let cleaned = content
@@ -272,27 +273,28 @@ Return ONLY valid JSON."#;
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
     let body = serde_json::json!({
-        "model": "phi4-mini",
+        "model": "bonsai-8b",
         "messages": [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": format!("Document: {}\nAnalysis:\n{}", filename, analysis_json) }
         ],
+        "max_tokens": 1536,
+        "temperature": 0.5,
         "stream": false,
-        "options": { "num_ctx": 4096 }
     });
 
     let resp = client
-        .post("http://127.0.0.1:11435/api/chat")
+        .post("http://127.0.0.1:11435/v1/chat/completions")
         .json(&body)
         .send()
         .await?;
 
     if !resp.status().is_success() {
-        anyhow::bail!("Ollama error: {}", resp.status());
+        anyhow::bail!("LLM error: {}", resp.status());
     }
 
     let json: serde_json::Value = resp.json().await?;
-    let content = json["message"]["content"].as_str().unwrap_or("{}");
+    let content = json["choices"][0]["message"]["content"].as_str().unwrap_or("{}");
     let cleaned = content
         .trim()
         .trim_start_matches("```json")

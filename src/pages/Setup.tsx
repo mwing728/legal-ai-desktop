@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Scale, Shield, Loader2, Download, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Scale, Shield, Loader2, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import { api } from "../lib/api";
 
 interface Props {
@@ -35,10 +35,6 @@ export default function Setup({ onReady }: Props) {
     switch (state) {
       case "starting":
         return "Starting AI engine...";
-      case "checking_model":
-        return "Checking AI model...";
-      case "pulling_model":
-        return "Downloading AI model (first time only)...";
       case "ready":
         return "Ready!";
       case "error":
@@ -79,27 +75,19 @@ export default function Setup({ onReady }: Props) {
               <AlertCircle className="w-5 h-5 text-red-400" />
             ) : state === "ready" ? (
               <CheckCircle className="w-5 h-5 text-emerald-400" />
-            ) : state === "pulling_model" ? (
-              <Download className="w-5 h-5 text-amber-400 animate-pulse" />
             ) : (
               <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
             )}
             <span className="text-sm text-zinc-300">{statusLabel()}</span>
           </div>
 
-          {(state === "starting" || state === "pulling_model" || state === "checking_model") && (
+          {state === "starting" && (
             <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
               <div
                 className="h-full bg-amber-600 rounded-full transition-all duration-300"
-                style={{ width: `${Math.max(progress, state === "starting" ? 5 : 0)}%` }}
+                style={{ width: `${Math.max(progress, 5)}%` }}
               />
             </div>
-          )}
-
-          {state === "pulling_model" && (
-            <p className="text-xs text-zinc-500">
-              Downloading phi4-mini ({progress.toFixed(0)}%) — this only happens once
-            </p>
           )}
 
           {error && (

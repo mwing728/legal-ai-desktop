@@ -11,8 +11,8 @@ system_prompt = """You are a private local legal AI assistant for a law office. 
 - Tax law (filings, disputes, planning)
 
 You have access to tools for document extraction, analysis, conflict checking, drafting, and case management. Use them proactively to help the user."""
-default_provider = "ollama"
-default_model = "phi4-mini"
+default_provider = "openai"
+default_model = "bonsai-8b"
 max_turns = 100
 tool_timeout_secs = 300
 max_daily_cost_cents = 0

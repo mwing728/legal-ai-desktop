@@ -38,25 +38,26 @@ fn make_err(tool_name: &str, msg: String) -> ToolResult {
     r
 }
 
-async fn call_ollama(system_prompt: &str, user_message: &str) -> Result<String> {
+async fn call_llm(system_prompt: &str, user_message: &str) -> Result<String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
     let body = serde_json::json!({
-        "model": "phi4-mini",
+        "model": "bonsai-8b",
         "messages": [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": user_message }
         ],
+        "max_tokens": 1024,
+        "temperature": 0.5,
         "stream": false,
-        "options": { "num_ctx": 8192, "num_predict": 1024 }
     });
-    let resp = client.post("http://127.0.0.1:11435/api/chat").json(&body).send().await?;
+    let resp = client.post("http://127.0.0.1:11435/v1/chat/completions").json(&body).send().await?;
     if !resp.status().is_success() {
-        anyhow::bail!("Ollama error: {}", resp.status());
+        anyhow::bail!("LLM error: {}", resp.status());
     }
     let json: Value = resp.json().await?;
-    Ok(json["message"]["content"].as_str().unwrap_or("").to_string())
+    Ok(json["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string())
 }
 
 fn parse_llm_json(raw: &str) -> Value {
@@ -167,7 +168,7 @@ impl Tool for DocAnalyzeTool {
         let system_prompt = r#"You are a legal document analyzer. Return ONLY valid JSON:
 {"doc_type":"string","category":"string (family_law|criminal|immigration|real_estate|estate|corporate|employment|ip|tax|general)","parties":["names"],"key_dates":[{"date":"...","description":"..."}],"summary":"2-3 sentences","key_terms":["terms"],"jurisdiction":"string or unknown","recommended_actions":["actions"]}"#;
 
-        let response = match call_ollama(system_prompt, truncated).await {
+        let response = match call_llm(system_prompt, truncated).await {
             Ok(r) => r,
             Err(e) => return Ok(make_err(self.name(), format!("LLM call failed: {e}"))),
         };
@@ -274,7 +275,7 @@ impl Tool for DocDraftTool {
             _ => return Ok(make_err(self.name(), format!("Unknown draft_type: {draft_type}"))),
         };
 
-        let draft = match call_ollama(system_prompt, context).await {
+        let draft = match call_llm(system_prompt, context).await {
             Ok(d) => d,
             Err(e) => return Ok(make_err(self.name(), format!("LLM call failed: {e}"))),
         };
@@ -317,7 +318,7 @@ impl Tool for ReviewPacketTool {
         let system_prompt = "Compile a review packet with sections: 1) DOCUMENT SUMMARY 2) KEY FINDINGS 3) PARTIES & CONFLICTS 4) RECOMMENDED ACTIONS 5) DEADLINES 6) RISK ASSESSMENT";
         let user_msg = format!("Document: {}\nAnalysis:\n{}\n\nConflicts:\n{}", doc.filename, analysis, conflicts_str);
 
-        let packet = match call_ollama(system_prompt, &user_msg).await {
+        let packet = match call_llm(system_prompt, &user_msg).await {
             Ok(p) => p,
             Err(e) => return Ok(make_err(self.name(), format!("LLM call failed: {e}"))),
         };
@@ -353,7 +354,7 @@ impl Tool for NextStepsTool {
 
         let system_prompt = r#"Return ONLY valid JSON: {"next_steps":["strings"],"deadlines":[{"title":"...","due_date":"YYYY-MM-DD","priority":"normal|high|urgent","description":"..."}],"action_items":[{"title":"...","priority":"normal|high|urgent","assignee":"attorney|paralegal|client","description":"..."}]}"#;
 
-        let response = match call_ollama(system_prompt, analysis_json).await {
+        let response = match call_llm(system_prompt, analysis_json).await {
             Ok(r) => r,
             Err(e) => return Ok(make_err(self.name(), format!("LLM call failed: {e}"))),
         };
@@ -572,7 +573,7 @@ impl Tool for DocOrganizeTool {
                 let system_prompt = "Given a document analysis and list of matters, return ONLY JSON: {\"matter_id\": <int or null>, \"reason\": \"...\"}";
                 let user_msg = format!("Analysis:\n{}\n\nMatters:\n{}", analysis, serde_json::to_string_pretty(&matters)?);
 
-                match call_ollama(system_prompt, &user_msg).await {
+                match call_llm(system_prompt, &user_msg).await {
                     Ok(resp) => {
                         let suggestion = parse_llm_json(&resp);
                         match suggestion["matter_id"].as_i64() {

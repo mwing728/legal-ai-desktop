@@ -10,43 +10,40 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{Manager, State};
 
-const OLLAMA_ADDR: &str = "127.0.0.1:11435";
-const OLLAMA_CHAT_URL: &str = "http://127.0.0.1:11435/api/chat";
-const OLLAMA_TAGS_URL: &str = "http://127.0.0.1:11435/api/tags";
-const OLLAMA_PULL_URL: &str = "http://127.0.0.1:11435/api/pull";
-const OLLAMA_MODEL: &str = "phi4-mini";
+const LLAMA_SERVER_HOST: &str = "127.0.0.1";
+const LLAMA_SERVER_PORT: &str = "11435";
+const LLAMA_SERVER_ADDR: &str = "127.0.0.1:11435";
+const LLAMA_CHAT_URL: &str = "http://127.0.0.1:11435/v1/chat/completions";
+const LLAMA_HEALTH_URL: &str = "http://127.0.0.1:11435/health";
+const BONSAI_MODEL: &str = "bonsai-8b";
+const BONSAI_GGUF: &str = "Bonsai-8B.gguf";
 
 #[derive(Clone, Serialize)]
-struct OllamaStatus {
+struct LlmStatus {
     state: String,
     progress: f64,
     error: Option<String>,
 }
 
-struct OllamaManager {
-    status: Arc<tokio::sync::RwLock<OllamaStatus>>,
+struct LlmManager {
+    status: Arc<tokio::sync::RwLock<LlmStatus>>,
     child_pid: Arc<tokio::sync::Mutex<Option<u32>>>,
 }
 
-fn find_ollama_binary() -> Option<std::path::PathBuf> {
+fn find_llama_server_binary() -> Option<std::path::PathBuf> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
 
     let search_dirs = vec![
-        exe_dir.join("ollama-bin"),
+        exe_dir.join("llama-server"),
         exe_dir.clone(),
-        exe_dir.join("resources").join("ollama-bin"),
-        exe_dir.join("../Resources").join("ollama-bin"),
+        exe_dir.join("resources").join("llama-server"),
+        exe_dir.join("../Resources").join("llama-server"),
         exe_dir.join("../Resources"),
     ];
 
     let candidate_names = [
-        "ollama-x86_64-pc-windows-msvc.exe",
-        "ollama.exe",
-        "ollama-x86_64-unknown-linux-gnu",
-        "ollama-aarch64-unknown-linux-gnu",
-        "ollama-aarch64-apple-darwin",
-        "ollama-x86_64-apple-darwin",
-        "ollama",
+        "llama-server.exe",
+        "llama-server",
     ];
 
     for dir in &search_dirs {
@@ -58,17 +55,45 @@ fn find_ollama_binary() -> Option<std::path::PathBuf> {
         }
     }
 
-    if let Ok(path) = which::which("ollama") {
+    if let Ok(path) = which::which("llama-server") {
         return Some(path);
     }
 
     None
 }
 
-impl OllamaManager {
+fn find_model_file() -> Option<std::path::PathBuf> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    let ironclaw_models = std::path::PathBuf::from(&home).join(".ironclaw").join("models");
+
+    let search_dirs = vec![
+        ironclaw_models,
+        exe_dir.join("llama-server"),
+        exe_dir.join("models"),
+        exe_dir.join("resources").join("llama-server"),
+        exe_dir.join("resources").join("models"),
+        exe_dir.join("../Resources").join("llama-server"),
+        exe_dir.join("../Resources").join("models"),
+        exe_dir.clone(),
+    ];
+
+    for dir in &search_dirs {
+        let p = dir.join(BONSAI_GGUF);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+
+    None
+}
+
+impl LlmManager {
     fn new() -> Self {
         Self {
-            status: Arc::new(tokio::sync::RwLock::new(OllamaStatus {
+            status: Arc::new(tokio::sync::RwLock::new(LlmStatus {
                 state: "starting".to_string(),
                 progress: 0.0,
                 error: None,
@@ -85,33 +110,43 @@ impl OllamaManager {
     }
 
     async fn spawn_and_wait(&self) {
-        let ollama_bin = match find_ollama_binary() {
+        let server_bin = match find_llama_server_binary() {
             Some(p) => p,
             None => {
                 self.set_state(
                     "error",
                     0.0,
-                    Some("Ollama binary not found in application directory".to_string()),
+                    Some("llama-server binary not found in application directory".to_string()),
                 )
                 .await;
                 return;
             }
         };
 
-        eprintln!("[ollama] Using binary: {}", ollama_bin.display());
+        let model_file = match find_model_file() {
+            Some(p) => p,
+            None => {
+                self.set_state(
+                    "error",
+                    0.0,
+                    Some(format!("{} model file not found. Place it in ~/.ironclaw/models/", BONSAI_GGUF)),
+                )
+                .await;
+                return;
+            }
+        };
 
-        let home = std::env::var("HOME")
-            .or_else(|_| std::env::var("USERPROFILE"))
-            .unwrap_or_else(|_| ".".to_string());
-        let models_dir = std::path::PathBuf::from(&home)
-            .join(".ironclaw")
-            .join("models");
-        let _ = std::fs::create_dir_all(&models_dir);
+        eprintln!("[llm] Using server: {}", server_bin.display());
+        eprintln!("[llm] Using model: {}", model_file.display());
 
-        let mut cmd = tokio::process::Command::new(&ollama_bin);
-        cmd.arg("serve")
-            .env("OLLAMA_HOST", OLLAMA_ADDR)
-            .env("OLLAMA_MODELS", models_dir.to_string_lossy().to_string())
+        let mut cmd = tokio::process::Command::new(&server_bin);
+        cmd.args([
+                "-m", &model_file.to_string_lossy(),
+                "--host", LLAMA_SERVER_HOST,
+                "--port", LLAMA_SERVER_PORT,
+                "-ngl", "99",
+                "--ctx-size", "4096",
+            ])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
 
@@ -121,15 +156,14 @@ impl OllamaManager {
             cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
         }
 
-        match cmd.spawn()
-        {
+        match cmd.spawn() {
             Ok(child) => {
                 let pid = child.id();
                 {
                     let mut stored_pid = self.child_pid.lock().await;
                     *stored_pid = pid;
                 }
-                eprintln!("[ollama] Spawned with PID: {:?}", pid);
+                eprintln!("[llm] Spawned with PID: {:?}", pid);
 
                 tokio::spawn(async move {
                     let output = child.wait_with_output().await;
@@ -137,25 +171,25 @@ impl OllamaManager {
                         Ok(o) => {
                             if !o.stderr.is_empty() {
                                 eprintln!(
-                                    "[ollama] stderr: {}",
+                                    "[llm] stderr: {}",
                                     String::from_utf8_lossy(&o.stderr)
                                 );
                             }
-                            eprintln!("[ollama] Process exited: {}", o.status);
+                            eprintln!("[llm] Process exited: {}", o.status);
                         }
-                        Err(e) => eprintln!("[ollama] Wait error: {}", e),
+                        Err(e) => eprintln!("[llm] Wait error: {}", e),
                     }
                 });
 
                 if self.wait_for_ready().await {
-                    self.ensure_model().await;
+                    self.set_state("ready", 100.0, None).await;
                 }
             }
             Err(e) => {
                 self.set_state(
                     "error",
                     0.0,
-                    Some(format!("Failed to start Ollama: {}", e)),
+                    Some(format!("Failed to start llama-server: {}", e)),
                 )
                 .await;
             }
@@ -165,13 +199,13 @@ impl OllamaManager {
     async fn wait_for_ready(&self) -> bool {
         let client = reqwest::Client::new();
         for i in 0..90 {
-            match client.get(OLLAMA_TAGS_URL).send().await {
+            match client.get(LLAMA_HEALTH_URL).send().await {
                 Ok(resp) if resp.status().is_success() => {
-                    self.set_state("checking_model", 0.0, None).await;
+                    self.set_state("ready", 100.0, None).await;
                     return true;
                 }
                 _ => {
-                    let progress = (i as f64 / 90.0) * 50.0;
+                    let progress = (i as f64 / 90.0) * 80.0;
                     self.set_state("starting", progress, None).await;
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 }
@@ -180,85 +214,10 @@ impl OllamaManager {
         self.set_state(
             "error",
             0.0,
-            Some("Ollama failed to start within 90 seconds".to_string()),
+            Some("llama-server failed to start within 90 seconds".to_string()),
         )
         .await;
         false
-    }
-
-    async fn ensure_model(&self) {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(7200))
-            .build()
-            .unwrap_or_default();
-
-        if let Ok(resp) = client.get(OLLAMA_TAGS_URL).send().await {
-            if let Ok(json) = resp.json::<serde_json::Value>().await {
-                if let Some(models) = json["models"].as_array() {
-                    let has_model = models.iter().any(|m| {
-                        m["name"]
-                            .as_str()
-                            .map(|n| n.starts_with(OLLAMA_MODEL))
-                            .unwrap_or(false)
-                    });
-                    if has_model {
-                        self.set_state("ready", 100.0, None).await;
-                        return;
-                    }
-                }
-            }
-        }
-
-        self.set_state("pulling_model", 0.0, None).await;
-
-        let body = serde_json::json!({"name": OLLAMA_MODEL, "stream": true});
-        match client.post(OLLAMA_PULL_URL).json(&body).send().await {
-            Ok(resp) => {
-                use futures_util::StreamExt;
-                let mut stream = resp.bytes_stream();
-                let mut buf = Vec::new();
-
-                while let Some(chunk) = stream.next().await {
-                    match chunk {
-                        Ok(bytes) => {
-                            buf.extend_from_slice(&bytes);
-                            while let Some(pos) = buf.iter().position(|&b| b == b'\n') {
-                                let line: Vec<u8> = buf.drain(..=pos).collect();
-                                if let Ok(json) =
-                                    serde_json::from_slice::<serde_json::Value>(&line)
-                                {
-                                    let total =
-                                        json["total"].as_f64().unwrap_or(1.0).max(1.0);
-                                    let completed =
-                                        json["completed"].as_f64().unwrap_or(0.0);
-                                    let pct = (completed / total) * 100.0;
-                                    self.set_state("pulling_model", pct, None).await;
-
-                                    if json["status"].as_str() == Some("success") {
-                                        self.set_state("ready", 100.0, None).await;
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            self.set_state(
-                                "error",
-                                0.0,
-                                Some(format!("Model download failed: {}", e)),
-                            )
-                            .await;
-                            return;
-                        }
-                    }
-                }
-                self.set_state("ready", 100.0, None).await;
-            }
-            Err(e) => {
-                self.set_state("error", 0.0, Some(format!("Failed to pull model: {}", e)))
-                    .await;
-            }
-        }
     }
 
     async fn kill(&self) {
@@ -284,19 +243,19 @@ impl OllamaManager {
 
 #[tauri::command]
 async fn get_ollama_status(
-    ollama: State<'_, OllamaManager>,
-) -> Result<OllamaStatus, String> {
-    Ok(ollama.status.read().await.clone())
+    mgr: State<'_, LlmManager>,
+) -> Result<LlmStatus, String> {
+    Ok(mgr.status.read().await.clone())
 }
 
 #[tauri::command]
-async fn retry_ollama_setup(ollama: State<'_, OllamaManager>) -> Result<(), String> {
-    ollama.kill().await;
+async fn retry_ollama_setup(mgr: State<'_, LlmManager>) -> Result<(), String> {
+    mgr.kill().await;
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    ollama.set_state("starting", 0.0, None).await;
-    let status = Arc::clone(&ollama.status);
-    let child_pid = Arc::clone(&ollama.child_pid);
-    let spawner = OllamaManager { status, child_pid };
+    mgr.set_state("starting", 0.0, None).await;
+    let status = Arc::clone(&mgr.status);
+    let child_pid = Arc::clone(&mgr.child_pid);
+    let spawner = LlmManager { status, child_pid };
     tauri::async_runtime::spawn(async move {
         spawner.spawn_and_wait().await;
     });
@@ -623,7 +582,7 @@ async fn process_document(
         .update_document_status(doc_id, "processing")
         .map_err(|e| e.to_string())?;
 
-    let (analysis, chunks_processed) = call_ollama_analyze(&state.http, &text)
+    let (analysis, chunks_processed) = call_llm_analyze(&state.http, &text)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -1131,7 +1090,7 @@ fn chunk_text(text: &str) -> Vec<String> {
     chunks
 }
 
-async fn call_ollama_analyze_chunk(
+async fn call_llm_analyze_chunk(
     client: &reqwest::Client,
     chunk: &str,
     chunk_index: usize,
@@ -1165,17 +1124,18 @@ Document text:
     );
 
     let body = serde_json::json!({
-        "model": OLLAMA_MODEL,
+        "model": BONSAI_MODEL,
         "messages": [
             {"role": "system", "content": "You are a legal document analyst. Respond ONLY with valid JSON, no other text."},
             {"role": "user", "content": prompt}
         ],
+        "max_tokens": 1536,
+        "temperature": 0.5,
         "stream": false,
-        "options": {"num_ctx": 4096, "num_predict": 1536},
     });
 
     let resp = client
-        .post(OLLAMA_CHAT_URL)
+        .post(LLAMA_CHAT_URL)
         .json(&body)
         .send()
         .await?;
@@ -1183,11 +1143,11 @@ Document text:
     if !resp.status().is_success() {
         let status = resp.status();
         let error_body = resp.text().await.unwrap_or_default();
-        anyhow::bail!("Ollama error {}: {}", status, error_body);
+        anyhow::bail!("LLM error {}: {}", status, error_body);
     }
 
     let json: serde_json::Value = resp.json().await?;
-    let content = json["message"]["content"]
+    let content = json["choices"][0]["message"]["content"]
         .as_str()
         .unwrap_or("{}")
         .to_string();
@@ -1276,34 +1236,35 @@ Section summaries:
     );
 
     let body = serde_json::json!({
-        "model": OLLAMA_MODEL,
+        "model": BONSAI_MODEL,
         "messages": [
             {"role": "system", "content": "You are a legal document analyst. Write clear, detailed summaries."},
             {"role": "user", "content": prompt}
         ],
+        "max_tokens": 1536,
+        "temperature": 0.5,
         "stream": false,
-        "options": {"num_ctx": 4096, "num_predict": 1536},
     });
 
     let resp = client
-        .post(OLLAMA_CHAT_URL)
+        .post(LLAMA_CHAT_URL)
         .json(&body)
         .send()
         .await?;
 
     if !resp.status().is_success() {
-        anyhow::bail!("Ollama summary merge error: {}", resp.status());
+        anyhow::bail!("LLM summary merge error: {}", resp.status());
     }
 
     let json: serde_json::Value = resp.json().await?;
-    Ok(json["message"]["content"]
+    Ok(json["choices"][0]["message"]["content"]
         .as_str()
         .unwrap_or("")
         .trim()
         .to_string())
 }
 
-async fn call_ollama_analyze(
+async fn call_llm_analyze(
     client: &reqwest::Client,
     text: &str,
 ) -> anyhow::Result<(serde_json::Value, usize)> {
@@ -1312,7 +1273,7 @@ async fn call_ollama_analyze(
     let mut results = Vec::with_capacity(total);
 
     for (i, chunk) in chunks.iter().enumerate() {
-        let result = call_ollama_analyze_chunk(client, chunk, i, total).await?;
+        let result = call_llm_analyze_chunk(client, chunk, i, total).await?;
         results.push(result);
     }
 
@@ -1836,8 +1797,8 @@ pub fn run() {
             dlp_engine,
             cost_tracker,
             skill_scanner,
-            provider_name: "ollama".to_string(),
-            model: Some(OLLAMA_MODEL.to_string()),
+            provider_name: "openai".to_string(),
+            model: Some(BONSAI_MODEL.to_string()),
             ui_sender: None,
             channel_manager: None,
             session_auth: None,
@@ -1859,10 +1820,10 @@ pub fn run() {
         (db, http, engine, wf_engine)
     });
 
-    let ollama_manager = OllamaManager::new();
-    let ollama_for_shutdown = OllamaManager {
-        status: Arc::clone(&ollama_manager.status),
-        child_pid: Arc::clone(&ollama_manager.child_pid),
+    let llm_manager = LlmManager::new();
+    let llm_for_shutdown = LlmManager {
+        status: Arc::clone(&llm_manager.status),
+        child_pid: Arc::clone(&llm_manager.child_pid),
     };
 
     tauri::Builder::default()
@@ -1876,12 +1837,12 @@ pub fn run() {
             workflows: Arc::new(tokio::sync::Mutex::new(workflows)),
             ocr_tools_dir: find_ocr_tools_dir(),
         })
-        .manage(ollama_manager)
+        .manage(llm_manager)
         .setup(|app| {
-            let mgr = app.state::<OllamaManager>();
+            let mgr = app.state::<LlmManager>();
             let status = Arc::clone(&mgr.status);
             let child_pid = Arc::clone(&mgr.child_pid);
-            let spawner = OllamaManager { status, child_pid };
+            let spawner = LlmManager { status, child_pid };
             tauri::async_runtime::spawn(async move {
                 spawner.spawn_and_wait().await;
             });
@@ -1929,7 +1890,7 @@ pub fn run() {
             match event {
                 tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. } => {
                     let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(ollama_for_shutdown.kill());
+                    rt.block_on(llm_for_shutdown.kill());
                 }
                 _ => {}
             }

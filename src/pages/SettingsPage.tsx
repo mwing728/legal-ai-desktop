@@ -3,9 +3,9 @@ import { Settings, Server, Brain, FolderOpen, Shield, Trash2, AlertTriangle } fr
 import { api } from "../lib/api";
 
 export default function SettingsPage() {
-  const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
-  const [model, setModel] = useState("phi4-mini");
-  const [contextSize, setContextSize] = useState("32768");
+  const [serverUrl, setServerUrl] = useState("http://127.0.0.1:11435");
+  const [model, setModel] = useState("bonsai-8b");
+  const [contextSize, setContextSize] = useState("4096");
   const [inboxPath, setInboxPath] = useState("~/.ironclaw/inbox");
   const [dbPath, setDbPath] = useState("~/.ironclaw/legal.db");
 
@@ -48,13 +48,13 @@ export default function SettingsPage() {
       <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-5">
         <div className="flex items-center gap-2 mb-2">
           <Server className="w-4 h-4 text-blue-400" />
-          <h2 className="text-sm font-semibold">Ollama Server</h2>
+          <h2 className="text-sm font-semibold">LLM Server</h2>
         </div>
         <div>
           <label className="text-xs text-zinc-500">Base URL</label>
           <input
-            value={ollamaUrl}
-            onChange={(e) => setOllamaUrl(e.target.value)}
+            value={serverUrl}
+            onChange={(e) => setServerUrl(e.target.value)}
             className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-amber-600"
           />
         </div>
@@ -100,7 +100,7 @@ export default function SettingsPage() {
           </p>
           <p>
             <span className="text-zinc-300 font-medium">Local Processing</span>{" "}
-            — All AI inference runs locally via Ollama. No data leaves your machine.
+            — All AI inference runs locally via Bonsai 8B. No data leaves your machine.
           </p>
           <p>
             <span className="text-zinc-300 font-medium">Audit Trail</span>{" "}
@@ -120,7 +120,7 @@ export default function SettingsPage() {
           <h2 className="text-sm font-semibold">Data Management</h2>
         </div>
         <p className="text-xs text-zinc-400 mb-4">
-          Delete all application data including the AI model (~3 GB), database,
+          Delete all application data including the AI model (~1.2 GB), database,
           documents, and settings. This cannot be undone.
         </p>
         <DeleteDataButton />
@@ -173,7 +173,7 @@ function DeleteDataButton() {
               Are you sure? This will permanently delete:
             </p>
             <ul className="text-[10px] text-red-400 mt-1 space-y-0.5 list-disc list-inside">
-              <li>AI model files (~3 GB)</li>
+              <li>AI model files (~1.2 GB)</li>
               <li>All clients, matters, and documents</li>
               <li>Audit logs and settings</li>
             </ul>
