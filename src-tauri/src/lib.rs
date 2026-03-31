@@ -139,6 +139,8 @@ impl LlmManager {
         eprintln!("[llm] Using server: {}", server_bin.display());
         eprintln!("[llm] Using model: {}", model_file.display());
 
+        let server_dir = server_bin.parent().unwrap_or(std::path::Path::new("."));
+
         let mut cmd = tokio::process::Command::new(&server_bin);
         cmd.args([
                 "-m", &model_file.to_string_lossy(),
@@ -147,6 +149,7 @@ impl LlmManager {
                 "-ngl", "99",
                 "--ctx-size", "4096",
             ])
+            .current_dir(server_dir)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
 

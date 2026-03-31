@@ -33,29 +33,42 @@ build_llama_server() {
     git clone --depth 1 "$LLAMA_CPP_REPO" "$tmpdir/llama.cpp"
     cd "$tmpdir/llama.cpp"
 
-    echo "Building llama-server..."
+    echo "Building llama-server (static)..."
     case "$os" in
         linux)
-            cmake -B build -DGGML_CUDA=ON 2>/dev/null || cmake -B build
+            cmake -B build -DBUILD_SHARED_LIBS=OFF -DGGML_CUDA=ON 2>/dev/null \
+                || cmake -B build -DBUILD_SHARED_LIBS=OFF
             cmake --build build -j --target llama-server
             cp build/bin/llama-server "$OUT_DIR/llama-server"
+            # Copy any shared libs that ended up alongside the binary
+            cp build/bin/*.so "$OUT_DIR/" 2>/dev/null || true
+            cp build/lib/*.so "$OUT_DIR/" 2>/dev/null || true
             ;;
         macos)
-            cmake -B build
+            cmake -B build -DBUILD_SHARED_LIBS=OFF
             cmake --build build -j --target llama-server
             cp build/bin/llama-server "$OUT_DIR/llama-server"
+            cp build/bin/*.dylib "$OUT_DIR/" 2>/dev/null || true
+            cp build/lib/*.dylib "$OUT_DIR/" 2>/dev/null || true
             ;;
         windows)
-            cmake -B build
+            cmake -B build -DBUILD_SHARED_LIBS=OFF
             cmake --build build -j --target llama-server --config Release
-            cp build/bin/Release/llama-server.exe "$OUT_DIR/llama-server.exe" 2>/dev/null \
-                || cp build/bin/llama-server.exe "$OUT_DIR/llama-server.exe"
+            local bindir="build/bin/Release"
+            [ ! -d "$bindir" ] && bindir="build/bin"
+            cp "$bindir/llama-server.exe" "$OUT_DIR/llama-server.exe"
+            cp "$bindir"/*.dll "$OUT_DIR/" 2>/dev/null || true
+            cp build/bin/*.dll "$OUT_DIR/" 2>/dev/null || true
+            cp build/lib/Release/*.dll "$OUT_DIR/" 2>/dev/null || true
+            cp build/lib/*.dll "$OUT_DIR/" 2>/dev/null || true
             ;;
     esac
 
     chmod +x "$OUT_DIR"/llama-server* 2>/dev/null || true
     rm -rf "$tmpdir"
     echo "llama-server built successfully."
+    echo "Bundled files:"
+    ls -lh "$OUT_DIR"/
 }
 
 download_model() {
