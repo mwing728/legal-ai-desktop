@@ -222,11 +222,11 @@ Return ONLY valid JSON, no markdown or explanation."#;
             { "role": "user", "content": format!("Analyze this legal document:\n\n{}", truncated) }
         ],
         "stream": false,
-        "options": { "num_ctx": 32768 }
+        "options": { "num_ctx": 4096 }
     });
 
     let resp = client
-        .post("http://localhost:11434/api/chat")
+        .post("http://127.0.0.1:11435/api/chat")
         .json(&body)
         .send()
         .await?;
@@ -278,11 +278,11 @@ Return ONLY valid JSON."#;
             { "role": "user", "content": format!("Document: {}\nAnalysis:\n{}", filename, analysis_json) }
         ],
         "stream": false,
-        "options": { "num_ctx": 32768 }
+        "options": { "num_ctx": 4096 }
     });
 
     let resp = client
-        .post("http://localhost:11434/api/chat")
+        .post("http://127.0.0.1:11435/api/chat")
         .json(&body)
         .send()
         .await?;

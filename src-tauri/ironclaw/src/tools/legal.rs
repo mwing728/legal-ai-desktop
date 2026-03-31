@@ -51,7 +51,7 @@ async fn call_ollama(system_prompt: &str, user_message: &str) -> Result<String> 
         "stream": false,
         "options": { "num_ctx": 8192, "num_predict": 1024 }
     });
-    let resp = client.post("http://localhost:11434/api/chat").json(&body).send().await?;
+    let resp = client.post("http://127.0.0.1:11435/api/chat").json(&body).send().await?;
     if !resp.status().is_success() {
         anyhow::bail!("Ollama error: {}", resp.status());
     }

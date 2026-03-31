@@ -748,7 +748,7 @@ impl OllamaProvider {
             model,
             base_url,
             timeout_secs: DEFAULT_TIMEOUT_SECS * 2, // local models can be slower
-            num_ctx: 32768,
+            num_ctx: 4096,
             max_tokens,
         })
     }

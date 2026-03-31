@@ -1162,7 +1162,7 @@ Document text:
             {"role": "user", "content": prompt}
         ],
         "stream": false,
-        "options": {"num_ctx": 16384, "num_predict": 1536},
+        "options": {"num_ctx": 4096, "num_predict": 1536},
     });
 
     let resp = client
@@ -1273,7 +1273,7 @@ Section summaries:
             {"role": "user", "content": prompt}
         ],
         "stream": false,
-        "options": {"num_ctx": 8192, "num_predict": 1536},
+        "options": {"num_ctx": 4096, "num_predict": 1536},
     });
 
     let resp = client
