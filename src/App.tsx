@@ -44,10 +44,10 @@ function PageLoader() {
 }
 
 export default function App() {
-  const [ollamaReady, setOllamaReady] = useState(false);
-  const handleReady = useCallback(() => setOllamaReady(true), []);
+  const [llmReady, setLlmReady] = useState(false);
+  const handleReady = useCallback(() => setLlmReady(true), []);
 
-  if (!ollamaReady) {
+  if (!llmReady) {
     return <Setup onReady={handleReady} />;
   }
 

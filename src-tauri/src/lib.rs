@@ -242,14 +242,14 @@ impl LlmManager {
 }
 
 #[tauri::command]
-async fn get_ollama_status(
+async fn get_llm_status(
     mgr: State<'_, LlmManager>,
 ) -> Result<LlmStatus, String> {
     Ok(mgr.status.read().await.clone())
 }
 
 #[tauri::command]
-async fn retry_ollama_setup(mgr: State<'_, LlmManager>) -> Result<(), String> {
+async fn retry_llm_setup(mgr: State<'_, LlmManager>) -> Result<(), String> {
     mgr.kill().await;
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     mgr.set_state("starting", 0.0, None).await;
@@ -541,7 +541,7 @@ fn resolve_conflict(state: State<AppState>, id: i64, note: String) -> Result<(),
         .map_err(|e| e.to_string())
 }
 
-// ── Document Processing (extract + chunked analyze via Ollama) ──────
+// ── Document Processing (extract + chunked analyze via LLM) ─────────
 
 #[derive(Serialize)]
 pub struct ProcessResult {
@@ -1880,8 +1880,8 @@ pub fn run() {
             delete_matter,
             draft_document,
             generate_review_packet,
-            get_ollama_status,
-            retry_ollama_setup,
+            get_llm_status,
+            retry_llm_setup,
             delete_all_app_data,
         ])
         .build(tauri::generate_context!())

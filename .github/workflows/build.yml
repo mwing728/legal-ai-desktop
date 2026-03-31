@@ -43,7 +43,8 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             tesseract-ocr \
-            poppler-utils
+            poppler-utils \
+            cmake
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -64,34 +65,36 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Install zstd (macOS)
-        if: runner.os == 'macOS'
-        run: brew install zstd
-
-      - name: Install zstd (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y zstd
-
-      - name: Download Ollama sidecar (Linux/macOS)
+      - name: Build llama-server sidecar (Linux/macOS)
         if: runner.os != 'Windows'
-        run: bash scripts/download-ollama.sh ${{ matrix.target }}
+        run: bash scripts/download-llama-server.sh
 
-      - name: Download Ollama sidecar (Windows)
+      - name: Build llama-server sidecar (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $version = "0.19.0"
-          $outDir = "src-tauri/ollama-bin"
+          $outDir = "src-tauri/llama-server"
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-          $url = "https://github.com/ollama/ollama/releases/download/v${version}/ollama-windows-amd64.zip"
-          $dest = Join-Path $outDir "ollama-x86_64-pc-windows-msvc.exe"
-          Write-Host "Downloading $url"
-          Invoke-WebRequest -Uri $url -OutFile ollama-windows.zip
-          Expand-Archive ollama-windows.zip -DestinationPath ollama-temp
-          $found = Get-ChildItem -Path ollama-temp -Recurse -Filter "ollama.exe" | Select-Object -First 1
-          Copy-Item $found.FullName $dest
-          Remove-Item -Recurse -Force ollama-temp, ollama-windows.zip
-          Write-Host "Done: $(Get-Item $dest | Select-Object -ExpandProperty Length) bytes"
+
+          $repo = "https://github.com/PrismML-Eng/llama.cpp"
+          $modelUrl = "https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B.gguf"
+
+          Write-Host "Cloning PrismML llama.cpp fork..."
+          git clone --depth 1 $repo llama-cpp-src
+
+          Write-Host "Building llama-server..."
+          cmake -B llama-cpp-src/build -S llama-cpp-src
+          cmake --build llama-cpp-src/build -j --target llama-server --config Release
+
+          $bin = Get-ChildItem -Path llama-cpp-src/build -Recurse -Filter "llama-server.exe" | Select-Object -First 1
+          Copy-Item $bin.FullName "$outDir/llama-server.exe"
+          Remove-Item -Recurse -Force llama-cpp-src
+
+          Write-Host "Downloading Bonsai-8B model..."
+          Invoke-WebRequest -Uri $modelUrl -OutFile "$outDir/Bonsai-8B.gguf"
+
+          Write-Host "llama-server sidecar ready:"
+          Get-ChildItem $outDir | Format-Table Name, Length
 
       - name: Bundle OCR tools (Linux)
         if: runner.os == 'Linux'
@@ -182,7 +185,7 @@ jobs:
           releaseBody: |
             Download the installer for your platform below.
 
-            **First launch:** The app will download the AI model (~3 GB) on first run. This only happens once.
+            **AI model:** Bonsai 8B (~1.2 GB) is bundled with the installer. No additional downloads required.
 
             **Uninstall:** Use your platform's standard uninstall method. To also remove AI model data, use Settings > Delete All Data before uninstalling.
           releaseDraft: true

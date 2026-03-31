@@ -124,7 +124,7 @@ export interface ReviewPacketResult {
   packet: string;
 }
 
-export interface OllamaStatus {
+export interface LlmStatus {
   state: string;
   progress: number;
   error: string | null;
@@ -208,7 +208,7 @@ export const api = {
   generateReviewPacket: (documentId: number) =>
     invoke<ReviewPacketResult>("generate_review_packet", { documentId }),
 
-  getOllamaStatus: () => invoke<OllamaStatus>("get_ollama_status"),
-  retryOllamaSetup: () => invoke<void>("retry_ollama_setup"),
+  getLlmStatus: () => invoke<LlmStatus>("get_llm_status"),
+  retryLlmSetup: () => invoke<void>("retry_llm_setup"),
   deleteAllAppData: () => invoke<string>("delete_all_app_data"),
 };

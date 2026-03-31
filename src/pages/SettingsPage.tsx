@@ -44,7 +44,7 @@ export default function SettingsPage() {
         </div>
       </section>
 
-      {/* Ollama Configuration */}
+      {/* LLM Server Configuration */}
       <section className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-6 space-y-5">
         <div className="flex items-center gap-2 mb-2">
           <Server className="w-4 h-4 text-blue-400" />

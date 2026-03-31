@@ -13,7 +13,7 @@ export default function Setup({ onReady }: Props) {
 
   const poll = useCallback(async () => {
     try {
-      const status = await api.getOllamaStatus();
+      const status = await api.getLlmStatus();
       setState(status.state);
       setProgress(status.progress);
       setError(status.error);
@@ -49,7 +49,7 @@ export default function Setup({ onReady }: Props) {
     setState("starting");
     setProgress(0);
     try {
-      await api.retryOllamaSetup();
+      await api.retryLlmSetup();
     } catch {
       // Backend will update status via polling
     }
