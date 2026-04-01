@@ -33,6 +33,8 @@ export default function Setup({ onReady }: Props) {
 
   const statusLabel = () => {
     switch (state) {
+      case "downloading":
+        return "Downloading AI model (~2.5 GB)...";
       case "starting":
         return "Starting AI engine...";
       case "ready":
@@ -81,7 +83,7 @@ export default function Setup({ onReady }: Props) {
             <span className="text-sm text-zinc-300">{statusLabel()}</span>
           </div>
 
-          {state === "starting" && (
+          {(state === "starting" || state === "downloading") && (
             <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
               <div
                 className="h-full bg-amber-600 rounded-full transition-all duration-300"

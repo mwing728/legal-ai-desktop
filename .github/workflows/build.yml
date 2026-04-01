@@ -85,7 +85,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
           $repo = "https://github.com/ggml-org/llama.cpp"
-          $modelUrl = "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
 
           Write-Host "Cloning llama.cpp..."
           git clone --depth 1 $repo llama-cpp-src
@@ -173,8 +172,7 @@ jobs:
           Write-Host "All bundled DLLs:"
           Get-ChildItem "$outDir/*.dll" | Format-Table Name, Length
 
-          Write-Host "Downloading Phi-4 Mini model..."
-          Invoke-WebRequest -Uri $modelUrl -OutFile "$outDir/phi-4-mini-instruct-q4_k_m.gguf"
+          # Model is downloaded on first launch by the app, not at build time.
 
           Write-Host "llama-server sidecar ready:"
           Get-ChildItem $outDir | Format-Table Name, Length
@@ -268,7 +266,7 @@ jobs:
           releaseBody: |
             Download the installer for your platform below.
 
-            **AI model:** Phi-4 Mini (~2.5 GB) is bundled with the installer. No additional downloads required.
+            **AI model:** Phi-4 Mini (~2.5 GB) is downloaded automatically on first launch. Internet connection required for initial setup.
 
             **Uninstall:** Use your platform's standard uninstall method. To also remove AI model data, use Settings > Delete All Data before uninstalling.
           releaseDraft: true

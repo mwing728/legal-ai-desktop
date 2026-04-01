@@ -120,7 +120,7 @@ export default function SettingsPage() {
           <h2 className="text-sm font-semibold">Data Management</h2>
         </div>
         <p className="text-xs text-zinc-400 mb-4">
-          Delete all application data including the AI model (~1.2 GB), database,
+          Delete all application data including the AI model (~2.5 GB), database,
           documents, and settings. This cannot be undone.
         </p>
         <DeleteDataButton />

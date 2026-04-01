@@ -17,6 +17,7 @@ const LLAMA_CHAT_URL: &str = "http://127.0.0.1:11435/v1/chat/completions";
 const LLAMA_HEALTH_URL: &str = "http://127.0.0.1:11435/health";
 const PHI4_MODEL: &str = "phi-4-mini";
 const PHI4_GGUF: &str = "phi-4-mini-instruct-q4_k_m.gguf";
+const PHI4_MODEL_URL: &str = "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf";
 
 #[derive(Clone, Serialize)]
 struct LlmStatus {
@@ -126,13 +127,18 @@ impl LlmManager {
         let model_file = match find_model_file() {
             Some(p) => p,
             None => {
-                self.set_state(
-                    "error",
-                    0.0,
-                    Some(format!("{} model file not found. Place it in ~/.ironclaw/models/", PHI4_GGUF)),
-                )
-                .await;
-                return;
+                match self.download_model().await {
+                    Ok(p) => p,
+                    Err(e) => {
+                        self.set_state(
+                            "error",
+                            0.0,
+                            Some(format!("Failed to download model: {}", e)),
+                        )
+                        .await;
+                        return;
+                    }
+                }
             }
         };
 
@@ -199,6 +205,58 @@ impl LlmManager {
                 .await;
             }
         }
+    }
+
+    async fn download_model(&self) -> anyhow::Result<std::path::PathBuf> {
+        use tokio::io::AsyncWriteExt;
+
+        let home = std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .unwrap_or_else(|_| ".".to_string());
+        let models_dir = std::path::PathBuf::from(&home).join(".ironclaw").join("models");
+        std::fs::create_dir_all(&models_dir)?;
+        let dest = models_dir.join(PHI4_GGUF);
+
+        if dest.exists() {
+            return Ok(dest);
+        }
+
+        eprintln!("[llm] Downloading model from {}", PHI4_MODEL_URL);
+        self.set_state("downloading", 0.0, None).await;
+
+        let client = reqwest::Client::new();
+        let resp = client.get(PHI4_MODEL_URL).send().await?;
+
+        if !resp.status().is_success() {
+            anyhow::bail!("HTTP {} from model download", resp.status());
+        }
+
+        let total_size = resp.content_length().unwrap_or(0);
+        let mut downloaded: u64 = 0;
+
+        let tmp_path = dest.with_extension("gguf.tmp");
+        let mut file = tokio::fs::File::create(&tmp_path).await?;
+        let mut stream = resp.bytes_stream();
+
+        use futures_util::StreamExt;
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            file.write_all(&chunk).await?;
+            downloaded += chunk.len() as u64;
+
+            if total_size > 0 {
+                let pct = (downloaded as f64 / total_size as f64) * 80.0;
+                self.set_state("downloading", pct, None).await;
+            }
+        }
+        file.flush().await?;
+        drop(file);
+
+        tokio::fs::rename(&tmp_path, &dest).await?;
+        self.set_state("downloading", 80.0, None).await;
+        eprintln!("[llm] Model downloaded to {}", dest.display());
+
+        Ok(dest)
     }
 
     async fn wait_for_ready(&self) -> bool {

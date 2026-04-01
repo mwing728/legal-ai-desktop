@@ -224,7 +224,11 @@ else
     build_llama_server "$OS"
 fi
 
-download_model
+# Model is downloaded on first launch by the app, not at build time.
+# For local development, run: download_model
+if [ "${1:-}" = "--with-model" ]; then
+    download_model
+fi
 
 echo ""
 echo "Done! Files in: $OUT_DIR"
