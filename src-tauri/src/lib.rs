@@ -150,6 +150,8 @@ impl LlmManager {
                 "--ctx-size", "4096",
             ])
             .current_dir(server_dir)
+            .env("LD_LIBRARY_PATH", server_dir)
+            .env("DYLD_LIBRARY_PATH", server_dir)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
 

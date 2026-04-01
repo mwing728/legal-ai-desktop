@@ -65,6 +65,14 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Install OpenSSL (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install openssl --no-progress -y
+          Write-Host "OpenSSL installed at:"
+          Get-ChildItem "C:\Program Files\OpenSSL-Win64\bin\*.dll" -ErrorAction SilentlyContinue | Select-Object Name
+
       - name: Build llama-server sidecar (Linux/macOS)
         if: runner.os != 'Windows'
         run: bash scripts/download-llama-server.sh
@@ -83,20 +91,71 @@ jobs:
           git clone --depth 1 $repo llama-cpp-src
 
           Write-Host "Building llama-server (static)..."
-          cmake -B llama-cpp-src/build -S llama-cpp-src -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF -DLLAMA_SERVER_SSL=OFF
+          cmake -B llama-cpp-src/build -S llama-cpp-src -DBUILD_SHARED_LIBS=OFF
           cmake --build llama-cpp-src/build -j --target llama-server --config Release
 
           $bin = Get-ChildItem -Path llama-cpp-src/build -Recurse -Filter "llama-server.exe" | Select-Object -First 1
           Copy-Item $bin.FullName "$outDir/llama-server.exe"
 
-          # Copy any companion DLLs from the same directory and common lib paths
-          $binDir = $bin.DirectoryName
-          Get-ChildItem "$binDir/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination $outDir
-          Get-ChildItem "llama-cpp-src/build/bin/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination $outDir
-          Get-ChildItem "llama-cpp-src/build/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination $outDir
-          Get-ChildItem "llama-cpp-src/build/lib/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination $outDir
+          # Copy all DLLs from the build tree
+          Get-ChildItem -Path llama-cpp-src/build -Recurse -Filter "*.dll" | Copy-Item -Destination $outDir -Force
 
           Remove-Item -Recurse -Force llama-cpp-src
+
+          # Discover ALL runtime DLL dependencies via dumpbin and bundle non-system ones
+          $systemDllPatterns = @(
+            'kernel32', 'user32', 'advapi32', 'ws2_32', 'bcrypt', 'crypt32',
+            'secur32', 'ntdll', 'msvcrt', 'ucrtbase', 'vcruntime', 'msvcp',
+            'api-ms-win-', 'ext-ms-win-', 'ole32', 'oleaut32', 'shell32',
+            'gdi32', 'comctl32', 'comdlg32', 'shlwapi', 'rpcrt4', 'imm32',
+            'winmm', 'version', 'setupapi', 'cfgmgr32', 'winspool'
+          )
+
+          function Is-SystemDll($name) {
+            $lower = $name.ToLower()
+            foreach ($pat in $systemDllPatterns) {
+              if ($lower.StartsWith($pat)) { return $true }
+            }
+            return $false
+          }
+
+          $exePath = Join-Path $outDir "llama-server.exe"
+          $dumpOutput = & dumpbin /dependents $exePath 2>$null
+          $needed = $dumpOutput | Where-Object { $_ -match '^\s+\S+\.dll$' } |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { -not (Is-SystemDll $_) }
+
+          $searchDirs = @(
+            "C:\Program Files\OpenSSL-Win64\bin",
+            "C:\Program Files\OpenSSL\bin",
+            "C:\Windows\System32",
+            "C:\ProgramData\chocolatey\bin"
+          )
+
+          foreach ($dll in $needed) {
+            if (Test-Path (Join-Path $outDir $dll)) { continue }
+            $found = $null
+            try { $found = (where.exe $dll 2>$null) | Select-Object -First 1 } catch {}
+            if ($found -and (Test-Path $found)) {
+              Copy-Item $found $outDir
+              Write-Host "Bundled $dll from $found"
+              continue
+            }
+            foreach ($dir in $searchDirs) {
+              $candidate = Join-Path $dir $dll
+              if (Test-Path $candidate) {
+                Copy-Item $candidate $outDir
+                Write-Host "Bundled $dll from $dir"
+                break
+              }
+            }
+            if (-not (Test-Path (Join-Path $outDir $dll))) {
+              Write-Warning "MISSING: $dll - not found anywhere on build machine"
+            }
+          }
+
+          Write-Host "All bundled DLLs:"
+          Get-ChildItem "$outDir/*.dll" | Format-Table Name, Length
 
           Write-Host "Downloading Bonsai-8B model..."
           Invoke-WebRequest -Uri $modelUrl -OutFile "$outDir/Bonsai-8B.gguf"
