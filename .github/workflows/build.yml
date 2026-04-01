@@ -120,10 +120,26 @@ jobs:
           }
 
           $exePath = Join-Path $outDir "llama-server.exe"
-          $dumpOutput = & dumpbin /dependents $exePath 2>$null
-          $needed = $dumpOutput | Where-Object { $_ -match '^\s+\S+\.dll$' } |
-            ForEach-Object { $_.Trim() } |
-            Where-Object { -not (Is-SystemDll $_) }
+
+          # Locate dumpbin via vswhere (VS is installed but not in PATH on GH Actions)
+          $dumpbinPath = $null
+          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vsWhere) {
+            $vsPath = & $vsWhere -latest -property installationPath
+            $dumpbinPath = Get-ChildItem "$vsPath\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+
+          $needed = @()
+          if ($dumpbinPath) {
+            Write-Host "Found dumpbin at: $($dumpbinPath.FullName)"
+            $dumpOutput = & $dumpbinPath.FullName /dependents $exePath 2>$null
+            $needed = $dumpOutput | Where-Object { $_ -match '^\s+\S+\.dll$' } |
+              ForEach-Object { $_.Trim() } |
+              Where-Object { -not (Is-SystemDll $_) }
+          } else {
+            Write-Host "WARNING: dumpbin not found, using known DLL list"
+            $needed = @("libssl-3-x64.dll", "libcrypto-3-x64.dll", "llama.dll", "ggml.dll", "mtmd.dll")
+          }
 
           $searchDirs = @(
             "C:\Program Files\OpenSSL-Win64\bin",
