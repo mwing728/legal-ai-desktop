@@ -43,7 +43,7 @@ async fn call_llm(system_prompt: &str, user_message: &str) -> Result<String> {
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
     let body = serde_json::json!({
-        "model": "bonsai-8b",
+        "model": "phi-4-mini",
         "messages": [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": user_message }

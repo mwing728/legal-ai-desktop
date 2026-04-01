@@ -84,10 +84,10 @@ jobs:
           $outDir = "src-tauri/llama-server"
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-          $repo = "https://github.com/PrismML-Eng/llama.cpp"
-          $modelUrl = "https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B.gguf"
+          $repo = "https://github.com/ggml-org/llama.cpp"
+          $modelUrl = "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
 
-          Write-Host "Cloning PrismML llama.cpp fork..."
+          Write-Host "Cloning llama.cpp..."
           git clone --depth 1 $repo llama-cpp-src
 
           Write-Host "Building llama-server (static)..."
@@ -173,8 +173,8 @@ jobs:
           Write-Host "All bundled DLLs:"
           Get-ChildItem "$outDir/*.dll" | Format-Table Name, Length
 
-          Write-Host "Downloading Bonsai-8B model..."
-          Invoke-WebRequest -Uri $modelUrl -OutFile "$outDir/Bonsai-8B.gguf"
+          Write-Host "Downloading Phi-4 Mini model..."
+          Invoke-WebRequest -Uri $modelUrl -OutFile "$outDir/phi-4-mini-instruct-q4_k_m.gguf"
 
           Write-Host "llama-server sidecar ready:"
           Get-ChildItem $outDir | Format-Table Name, Length
@@ -268,7 +268,7 @@ jobs:
           releaseBody: |
             Download the installer for your platform below.
 
-            **AI model:** Bonsai 8B (~1.2 GB) is bundled with the installer. No additional downloads required.
+            **AI model:** Phi-4 Mini (~2.5 GB) is bundled with the installer. No additional downloads required.
 
             **Uninstall:** Use your platform's standard uninstall method. To also remove AI model data, use Settings > Delete All Data before uninstalling.
           releaseDraft: true

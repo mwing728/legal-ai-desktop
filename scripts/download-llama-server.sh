@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Downloads PrismML's llama.cpp fork (with Q1_0 1-bit kernel support)
-# and the Bonsai-8B GGUF model file.
+# Builds llama-server from upstream llama.cpp and downloads
+# the Phi-4 Mini Instruct Q4_K_M GGUF model file.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT_DIR="${SCRIPT_DIR}/../src-tauri/llama-server"
 mkdir -p "$OUT_DIR"
 OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 
-LLAMA_CPP_REPO="https://github.com/PrismML-Eng/llama.cpp"
-MODEL_URL="https://huggingface.co/prism-ml/Bonsai-8B-gguf/resolve/main/Bonsai-8B.gguf"
-MODEL_FILE="Bonsai-8B.gguf"
+LLAMA_CPP_REPO="https://github.com/ggml-org/llama.cpp"
+MODEL_URL="https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf"
+MODEL_FILE="phi-4-mini-instruct-q4_k_m.gguf"
 
 detect_os() {
     local os
@@ -29,7 +29,7 @@ build_llama_server() {
     local tmpdir
     tmpdir="$(mktemp -d)"
 
-    echo "Cloning PrismML llama.cpp fork..."
+    echo "Cloning llama.cpp..."
     git clone --depth 1 "$LLAMA_CPP_REPO" "$tmpdir/llama.cpp"
     cd "$tmpdir/llama.cpp"
 
@@ -207,7 +207,7 @@ download_model() {
         return
     fi
 
-    echo "Downloading Bonsai-8B model (~1.16 GB)..."
+    echo "Downloading Phi-4 Mini model (~2.5 GB)..."
     curl -fSL --progress-bar -o "$dest" "$MODEL_URL"
     echo "Model downloaded: $dest"
 }

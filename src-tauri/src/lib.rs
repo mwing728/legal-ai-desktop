@@ -15,8 +15,8 @@ const LLAMA_SERVER_PORT: &str = "11435";
 const LLAMA_SERVER_ADDR: &str = "127.0.0.1:11435";
 const LLAMA_CHAT_URL: &str = "http://127.0.0.1:11435/v1/chat/completions";
 const LLAMA_HEALTH_URL: &str = "http://127.0.0.1:11435/health";
-const BONSAI_MODEL: &str = "bonsai-8b";
-const BONSAI_GGUF: &str = "Bonsai-8B.gguf";
+const PHI4_MODEL: &str = "phi-4-mini";
+const PHI4_GGUF: &str = "phi-4-mini-instruct-q4_k_m.gguf";
 
 #[derive(Clone, Serialize)]
 struct LlmStatus {
@@ -81,7 +81,7 @@ fn find_model_file() -> Option<std::path::PathBuf> {
     ];
 
     for dir in &search_dirs {
-        let p = dir.join(BONSAI_GGUF);
+        let p = dir.join(PHI4_GGUF);
         if p.exists() {
             return Some(p);
         }
@@ -129,7 +129,7 @@ impl LlmManager {
                 self.set_state(
                     "error",
                     0.0,
-                    Some(format!("{} model file not found. Place it in ~/.ironclaw/models/", BONSAI_GGUF)),
+                    Some(format!("{} model file not found. Place it in ~/.ironclaw/models/", PHI4_GGUF)),
                 )
                 .await;
                 return;
@@ -1129,7 +1129,7 @@ Document text:
     );
 
     let body = serde_json::json!({
-        "model": BONSAI_MODEL,
+        "model": PHI4_MODEL,
         "messages": [
             {"role": "system", "content": "You are a legal document analyst. Respond ONLY with valid JSON, no other text."},
             {"role": "user", "content": prompt}
@@ -1241,7 +1241,7 @@ Section summaries:
     );
 
     let body = serde_json::json!({
-        "model": BONSAI_MODEL,
+        "model": PHI4_MODEL,
         "messages": [
             {"role": "system", "content": "You are a legal document analyst. Write clear, detailed summaries."},
             {"role": "user", "content": prompt}
@@ -1803,7 +1803,7 @@ pub fn run() {
             cost_tracker,
             skill_scanner,
             provider_name: "openai".to_string(),
-            model: Some(BONSAI_MODEL.to_string()),
+            model: Some(PHI4_MODEL.to_string()),
             ui_sender: None,
             channel_manager: None,
             session_auth: None,
