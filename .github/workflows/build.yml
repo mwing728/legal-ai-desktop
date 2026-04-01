@@ -83,7 +83,7 @@ jobs:
           git clone --depth 1 $repo llama-cpp-src
 
           Write-Host "Building llama-server (static)..."
-          cmake -B llama-cpp-src/build -S llama-cpp-src -DBUILD_SHARED_LIBS=OFF
+          cmake -B llama-cpp-src/build -S llama-cpp-src -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF -DLLAMA_SERVER_SSL=OFF
           cmake --build llama-cpp-src/build -j --target llama-server --config Release
 
           $bin = Get-ChildItem -Path llama-cpp-src/build -Recurse -Filter "llama-server.exe" | Select-Object -First 1

@@ -36,8 +36,8 @@ build_llama_server() {
     echo "Building llama-server (static)..."
     case "$os" in
         linux)
-            cmake -B build -DBUILD_SHARED_LIBS=OFF -DGGML_CUDA=ON 2>/dev/null \
-                || cmake -B build -DBUILD_SHARED_LIBS=OFF
+            cmake -B build -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF -DLLAMA_SERVER_SSL=OFF -DGGML_CUDA=ON 2>/dev/null \
+                || cmake -B build -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF -DLLAMA_SERVER_SSL=OFF
             cmake --build build -j --target llama-server
             cp build/bin/llama-server "$OUT_DIR/llama-server"
             # Copy any shared libs that ended up alongside the binary
@@ -45,14 +45,14 @@ build_llama_server() {
             cp build/lib/*.so "$OUT_DIR/" 2>/dev/null || true
             ;;
         macos)
-            cmake -B build -DBUILD_SHARED_LIBS=OFF
+            cmake -B build -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF -DLLAMA_SERVER_SSL=OFF
             cmake --build build -j --target llama-server
             cp build/bin/llama-server "$OUT_DIR/llama-server"
             cp build/bin/*.dylib "$OUT_DIR/" 2>/dev/null || true
             cp build/lib/*.dylib "$OUT_DIR/" 2>/dev/null || true
             ;;
         windows)
-            cmake -B build -DBUILD_SHARED_LIBS=OFF
+            cmake -B build -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF -DLLAMA_SERVER_SSL=OFF
             cmake --build build -j --target llama-server --config Release
             local bindir="build/bin/Release"
             [ ! -d "$bindir" ] && bindir="build/bin"
