@@ -91,7 +91,7 @@ export default function App() {
 
         <div className="p-4 border-t border-zinc-800">
           <div className="text-[10px] text-zinc-600 text-center">
-            Powered by Phi-4 Mini
+            Powered by Bonsai 8B &middot; PrismML
           </div>
         </div>
       </aside>

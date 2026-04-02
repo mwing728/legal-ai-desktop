@@ -216,7 +216,7 @@ Return ONLY valid JSON, no markdown or explanation."#;
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
     let body = serde_json::json!({
-        "model": "phi-4-mini",
+        "model": "bonsai-8b",
         "messages": [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": format!("Analyze this legal document:\n\n{}", truncated) }
@@ -273,7 +273,7 @@ Return ONLY valid JSON."#;
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
     let body = serde_json::json!({
-        "model": "phi-4-mini",
+        "model": "bonsai-8b",
         "messages": [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": format!("Document: {}\nAnalysis:\n{}", filename, analysis_json) }

@@ -34,7 +34,7 @@ export default function Setup({ onReady }: Props) {
   const statusLabel = () => {
     switch (state) {
       case "downloading":
-        return "Downloading AI model (~2.5 GB)...";
+        return "Downloading AI model (~1.2 GB)...";
       case "starting":
         return "Starting AI engine...";
       case "ready":
