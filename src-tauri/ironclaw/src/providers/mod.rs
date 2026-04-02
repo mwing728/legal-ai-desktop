@@ -741,7 +741,7 @@ pub struct OllamaProvider {
 
 impl OllamaProvider {
     pub fn new(config: Option<&ProviderConfig>, model_override: Option<&str>) -> Result<Self> {
-        let model = resolve_model(config, model_override, "bonsai-8b");
+        let model = resolve_model(config, model_override, "phi-4-mini");
         let base_url = resolve_base_url(config, "http://localhost:11434");
         let max_tokens = resolve_max_tokens(config, 4096);
         Ok(Self {

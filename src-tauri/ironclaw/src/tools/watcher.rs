@@ -199,7 +199,7 @@ fn extract_docx_text(path: &Path) -> Result<String> {
 }
 
 async fn analyze_document(text: &str) -> Result<serde_json::Value> {
-    let truncated = if text.len() > 12000 { &text[..12000] } else { text };
+    let truncated = if text.len() > 8000 { &text[..8000] } else { text };
     let system_prompt = r#"You are a legal document analyzer. Analyze the provided document and return a JSON object with these fields:
 - "doc_type": specific document type (e.g. "complaint", "contract", "will", "deed", "petition", "motion", "letter", "agreement", "order", "subpoena")
 - "category": broad legal category (one of: "family_law", "criminal", "immigration", "real_estate", "estate", "corporate", "employment", "ip", "tax", "general")
@@ -216,12 +216,12 @@ Return ONLY valid JSON, no markdown or explanation."#;
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
     let body = serde_json::json!({
-        "model": "bonsai-8b",
+        "model": "phi-4-mini",
         "messages": [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": format!("Analyze this legal document:\n\n{}", truncated) }
         ],
-        "max_tokens": 1536,
+        "max_tokens": 768,
         "temperature": 0.5,
         "stream": false,
     });
@@ -273,12 +273,12 @@ Return ONLY valid JSON."#;
         .timeout(std::time::Duration::from_secs(300))
         .build()?;
     let body = serde_json::json!({
-        "model": "bonsai-8b",
+        "model": "phi-4-mini",
         "messages": [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": format!("Document: {}\nAnalysis:\n{}", filename, analysis_json) }
         ],
-        "max_tokens": 1536,
+        "max_tokens": 512,
         "temperature": 0.5,
         "stream": false,
     });

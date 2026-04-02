@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 
 export default function SettingsPage() {
   const [serverUrl, setServerUrl] = useState("http://127.0.0.1:11435");
-  const [model, setModel] = useState("bonsai-8b");
+  const [model, setModel] = useState("phi-4-mini");
   const [contextSize, setContextSize] = useState("4096");
   const [inboxPath, setInboxPath] = useState("~/.ironclaw/inbox");
   const [dbPath, setDbPath] = useState("~/.ironclaw/legal.db");
@@ -100,7 +100,7 @@ export default function SettingsPage() {
           </p>
           <p>
             <span className="text-zinc-300 font-medium">Local Processing</span>{" "}
-            — All AI inference runs locally via Bonsai 8B. No data leaves your machine.
+            — All AI inference runs locally via Phi-4 Mini. No data leaves your machine.
           </p>
           <p>
             <span className="text-zinc-300 font-medium">Audit Trail</span>{" "}
@@ -120,7 +120,7 @@ export default function SettingsPage() {
           <h2 className="text-sm font-semibold">Data Management</h2>
         </div>
         <p className="text-xs text-zinc-400 mb-4">
-          Delete all application data including the AI model (~1.2 GB), database,
+          Delete all application data including the AI model (~2.5 GB), database,
           documents, and settings. This cannot be undone.
         </p>
         <DeleteDataButton />

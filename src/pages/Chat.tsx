@@ -215,7 +215,7 @@ export default function Chat() {
               <p className="text-xs text-zinc-500">
                 {selectedIds.size > 0
                   ? `${selectedIds.size} document${selectedIds.size !== 1 ? "s" : ""} selected for context`
-                  : "Legal analysis powered by Bonsai 8B"}
+                  : "Legal analysis powered by Phi-4 Mini"}
               </p>
             </div>
           </div>
